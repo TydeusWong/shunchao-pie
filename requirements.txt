@@ -1,0 +1,28 @@
+# 文字转语音相关
+websockets>=11.0.0
+
+# 图像处理相关
+pillow>=9.0.0
+
+# 语音识别相关
+dashscope>=1.10.0
+requests>=2.25.0
+
+# 音频处理相关
+pyaudio>=0.2.11
+# 注意：MPV播放器需要通过系统包管理器安装
+# sudo apt update && sudo apt install -y mpv
+# 注意：sox需要通过系统包管理器安装
+# sudo apt update && sudo apt install -y sox
+
+# 硬件驱动相关
+# 注意：以下依赖需要通过系统包管理器安装
+# sudo apt update && sudo apt install -y python3-spidev python3-rpi.gpio
+# 或者使用pip安装（如果可用）:
+# spidev>=3.5
+# RPi.GPIO>=0.7.1
+lgpio>=0.2.0.0
+
+# MQTT 相关
+paho-mqtt==1.6.1
+
