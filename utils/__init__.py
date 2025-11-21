@@ -6,6 +6,7 @@
 from .text_to_speech import TextToSpeech, synthesize_text
 from .flashcard import FlashCardMaker, create_flashcard
 from .speech_recognition import SpeechRecognition, recognize_audio
+from .object_detection import ObjectDetection, detect_object
 
 __all__ = [
     'TextToSpeech',
@@ -14,4 +15,6 @@ __all__ = [
     'create_flashcard',
     'SpeechRecognition',
     'recognize_audio',
+    'ObjectDetection',
+    'detect_object',
 ]

@@ -3,6 +3,11 @@ websockets>=11.0.0
 
 # 图像处理相关
 pillow>=9.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# YOLO 目标检测相关
+ultralytics>=8.0.0
 
 # 语音识别相关
 dashscope>=1.10.0

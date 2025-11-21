@@ -1,173 +1,144 @@
 #!/usr/bin/env python3
 """
-tydeus 项目摄像头测试文件
-用于测试摄像头拍摄功能
+tydeus 项目物体检测测试文件
+用于测试YOLO物体检测功能
 """
 import os
 import sys
-import time
-import cv2
-import numpy as np
+import json
 
-# 项目根目录
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-TEMP_DATA_DIR = os.path.join(PROJECT_ROOT, "temp_data")
+# 添加项目根目录到路径
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# 确保 temp_data 文件夹存在
-os.makedirs(TEMP_DATA_DIR, exist_ok=True)
+from utils.object_detection import ObjectDetection, detect_object
+from config import FILE_OBJECT_NAME
 
-# 摄像头分辨率设置（1080p）
-CAMERA_WIDTH = 1920
-CAMERA_HEIGHT = 1080
+# 测试图片路径
+TEST_IMAGE_PATH = "/home/pi/projects/tydeus/temp_data/yolo_test.jpg"
 
 
-def capture_photo_usb_camera():
-    """使用USB摄像头拍摄照片"""
-    print("尝试使用USB摄像头...")
-    cap = cv2.VideoCapture(0)
-    
-    if not cap.isOpened():
-        print("  ✗ USB摄像头无法打开")
-        return None
-    
-    try:
-        # 设置摄像头分辨率为1080p
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
-        
-        # 等待摄像头稳定
-        print("  等待摄像头稳定...")
-        time.sleep(1)
-        
-        # 读取几帧以让摄像头调整
-        for _ in range(5):
-            ret, frame = cap.read()
-            if not ret:
-                print("  ✗ 无法从USB摄像头读取帧")
-                return None
-        
-        # 拍摄照片
-        print("  正在拍摄照片...")
-        ret, frame = cap.read()
-        
-        if not ret or frame is None:
-            print("  ✗ 拍摄失败")
-            return None
-        
-        # 获取实际分辨率
-        actual_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        actual_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        print(f"  实际分辨率: {actual_width}x{actual_height}")
-        
-        # 如果实际分辨率不是1080p，尝试调整
-        if actual_width != CAMERA_WIDTH or actual_height != CAMERA_HEIGHT:
-            print(f"  调整图像分辨率到 {CAMERA_WIDTH}x{CAMERA_HEIGHT}")
-            frame = cv2.resize(frame, (CAMERA_WIDTH, CAMERA_HEIGHT))
-        
-        return frame
-        
-    finally:
-        cap.release()
-
-
-def capture_photo_picamera():
-    """使用树莓派摄像头拍摄照片"""
-    print("尝试使用树莓派摄像头...")
-    try:
-        from picamera2 import Picamera2
-        
-        picam2 = Picamera2()
-        
-        # 配置摄像头为1080p
-        config = picam2.create_still_configuration(
-            main={"size": (CAMERA_WIDTH, CAMERA_HEIGHT)}
-        )
-        picam2.configure(config)
-        picam2.start()
-        
-        # 等待摄像头稳定
-        print("  等待摄像头稳定...")
-        time.sleep(1)
-        
-        # 拍摄照片
-        print("  正在拍摄照片...")
-        frame = picam2.capture_array()
-        
-        # picamera2 返回的是RGB格式，需要转换为BGR（OpenCV格式）
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        
-        picam2.stop()
-        picam2.close()
-        
-        print(f"  实际分辨率: {CAMERA_WIDTH}x{CAMERA_HEIGHT}")
-        return frame
-        
-    except ImportError:
-        print("  ⚠ picamera2 未安装，跳过树莓派摄像头测试")
-        return None
-    except Exception as e:
-        print(f"  ✗ 树莓派摄像头错误: {e}")
-        return None
-
-
-def test_camera():
-    """测试摄像头拍摄功能"""
+def test_object_detection():
+    """测试物体检测功能"""
     print("=" * 60)
-    print("摄像头测试")
+    print("YOLO物体检测测试")
     print("=" * 60)
-    print(f"目标分辨率: {CAMERA_WIDTH}x{CAMERA_HEIGHT} (1080p)")
-    print(f"保存目录: {TEMP_DATA_DIR}")
+    print(f"测试图片: {TEST_IMAGE_PATH}")
+    print(f"输出文件: {FILE_OBJECT_NAME}")
     print("=" * 60)
     
-    frame = None
-    
-    # 首先尝试USB摄像头
-    frame = capture_photo_usb_camera()
-    
-    # 如果USB摄像头失败，尝试树莓派摄像头
-    if frame is None:
-        print("\nUSB摄像头不可用，尝试树莓派摄像头...")
-        frame = capture_photo_picamera()
-    
-    if frame is None:
-        print("\n✗ 所有摄像头都无法使用")
+    # 检查测试图片是否存在
+    if not os.path.exists(TEST_IMAGE_PATH):
+        print(f"\n✗ 测试图片不存在: {TEST_IMAGE_PATH}")
+        print("  请确保测试图片存在")
         return False
     
-    # 保存照片
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    filename = f"photo_{timestamp}.jpg"
-    filepath = os.path.join(TEMP_DATA_DIR, filename)
+    print(f"\n✓ 测试图片存在")
+    file_size = os.path.getsize(TEST_IMAGE_PATH)
+    print(f"  文件大小: {file_size / 1024:.2f} KB")
     
-    print(f"\n正在保存照片到: {filepath}")
-    success = cv2.imwrite(filepath, frame)
-    
-    if success:
-        file_size = os.path.getsize(filepath)
-        print(f"✓ 照片保存成功！")
-        print(f"  文件名: {filename}")
-        print(f"  文件大小: {file_size / 1024:.2f} KB")
-        print(f"  分辨率: {frame.shape[1]}x{frame.shape[0]}")
+    try:
+        print("\n[步骤1] 初始化物体检测工具...")
+        detector = ObjectDetection()
+        print("  ✓ 初始化成功")
+        
+        print("\n[步骤2] 开始检测物体...")
+        print("  注意: 首次运行会加载模型，可能需要一些时间...")
+        
+        success = detector.detect_and_save(TEST_IMAGE_PATH)
+        
+        if not success:
+            print("\n✗ 检测失败")
+            return False
+        
+        print("\n[步骤3] 读取检测结果...")
+        if not os.path.exists(FILE_OBJECT_NAME):
+            print(f"  ✗ 输出文件不存在: {FILE_OBJECT_NAME}")
+            return False
+        
+        with open(FILE_OBJECT_NAME, 'r', encoding='utf-8') as f:
+            result = json.load(f)
+        
+        object_name = result.get("object_name", "null")
+        
+        print(f"\n✓ 检测完成！")
+        print(f"  检测结果: {object_name}")
+        print(f"  结果文件: {FILE_OBJECT_NAME}")
+        print(f"\n结果文件内容:")
+        print(json.dumps(result, ensure_ascii=False, indent=4))
+        
+        if object_name == "null":
+            print("\n⚠ 注意: 检测结果为 'null'，可能是:")
+            print("  - 图片中未检测到hearer")
+            print("  - 图片中未检测到其他有效物体")
+            print("  - 检测过程中出现错误")
+        
         return True
-    else:
-        print("✗ 照片保存失败")
+        
+    except ImportError as e:
+        print(f"\n✗ 导入错误: {e}")
+        print("  提示: 请确保已安装所需依赖: pip install ultralytics opencv-python numpy")
+        return False
+    except Exception as e:
+        print(f"\n✗ 检测过程发生异常: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def test_convenience_function():
+    """测试便捷函数"""
+    print("\n" + "=" * 60)
+    print("便捷函数测试")
+    print("=" * 60)
+    
+    try:
+        print("\n使用便捷函数 detect_object()...")
+        success = detect_object(TEST_IMAGE_PATH)
+        
+        if success:
+            print("  ✓ 便捷函数调用成功")
+            
+            # 读取结果
+            with open(FILE_OBJECT_NAME, 'r', encoding='utf-8') as f:
+                result = json.load(f)
+            print(f"  检测结果: {result.get('object_name', 'null')}")
+            return True
+        else:
+            print("  ✗ 便捷函数调用失败")
+            return False
+            
+    except Exception as e:
+        print(f"  ✗ 便捷函数测试异常: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
 def main():
     """主函数"""
     print("\n" + "=" * 60)
-    print("tydeus 项目摄像头测试")
+    print("tydeus 项目物体检测测试")
     print("=" * 60)
     
     try:
-        success = test_camera()
+        # 测试1: 使用类方法
+        success1 = test_object_detection()
         
+        # 测试2: 使用便捷函数
+        success2 = test_convenience_function()
+        
+        # 输出测试结果汇总
         print("\n" + "=" * 60)
-        if success:
-            print("✓ 测试通过！")
-        else:
-            print("✗ 测试失败")
+        print("测试结果汇总")
         print("=" * 60)
+        print(f"类方法测试: {'✓ 通过' if success1 else '✗ 失败'}")
+        print(f"便捷函数测试: {'✓ 通过' if success2 else '✗ 失败'}")
+        print("=" * 60)
+        
+        if success1 and success2:
+            print("\n🎉 所有测试通过！")
+        else:
+            print("\n⚠️  部分测试失败，请检查")
         
     except KeyboardInterrupt:
         print("\n\n测试被用户中断")

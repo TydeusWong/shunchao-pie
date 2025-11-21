@@ -7,6 +7,7 @@ from .audio_player import AudioPlayer, play_audio_file
 from .ep1831t_driver import EP1831TDriver
 from .pressure_sensor import PressureSensor
 from .audio_recorder import AudioRecorder
+from .camera_capture import CameraCapture, capture_photo
 
 __all__ = [
     'AudioPlayer',
@@ -14,5 +15,7 @@ __all__ = [
     'EP1831TDriver',
     'PressureSensor',
     'AudioRecorder',
+    'CameraCapture',
+    'capture_photo',
 ]
 
