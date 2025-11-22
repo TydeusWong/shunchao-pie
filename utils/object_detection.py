@@ -202,7 +202,7 @@ class ObjectDetection:
     
     def _save_annotated_image(self, img, hearer_results, general_results, closest_name, original_image_path):
         """
-        保存带YOLO标签的图片
+        保存带YOLO标签的图片（已禁用，仅用于测试）
         
         参数:
             img: 原始图片（numpy数组）
@@ -211,6 +211,8 @@ class ObjectDetection:
             closest_name: 最接近的物体名称
             original_image_path: 原始图片路径
         """
+        # 已禁用保存标注图片功能（仅用于测试）
+        return
         try:
             # 复制原始图片用于绘制
             annotated_img = img.copy()

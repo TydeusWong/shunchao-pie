@@ -19,6 +19,11 @@ _play_pi_spec = importlib.util.spec_from_file_location("play_pi_file", _play_pi_
 _play_pi_module = importlib.util.module_from_spec(_play_pi_spec)
 _play_pi_spec.loader.exec_module(_play_pi_module)
 execute_response = _play_pi_module.execute_response
+# 导入硬件工具
+from hardware.pressure_sensor import PressureSensor
+from hardware.audio_recorder import AudioRecorder
+# 导入语音识别工具
+from utils.speech_recognition import SpeechRecognition
 
 # --- 全局同步事件 ---
 response_received_event = threading.Event()
@@ -194,7 +199,109 @@ def main():
     print("\n=== 音频交互测试 ===")
     print(f"Device ID: {DEVICE_ID}")
     
+    # 初始化压力传感器
+    pressure_sensor = None
     try:
+        pressure_sensor = PressureSensor()
+        log_system("✓ 压力传感器初始化成功")
+    except Exception as e:
+        log_system(f"⚠ 压力传感器初始化失败: {e}")
+        log_system("  将跳过压力传感器检测")
+    
+    # 初始化音频录音器
+    audio_recorder = None
+    try:
+        audio_recorder = AudioRecorder()
+        log_system("✓ 音频录音器初始化成功")
+    except Exception as e:
+        log_system(f"⚠ 音频录音器初始化失败: {e}")
+        log_system("  将跳过录音功能")
+    
+    # 初始化语音识别器
+    speech_recognizer = None
+    try:
+        speech_recognizer = SpeechRecognition()
+        log_system("✓ 语音识别器初始化成功")
+    except Exception as e:
+        log_system(f"⚠ 语音识别器初始化失败: {e}")
+        log_system("  将跳过语音识别功能")
+    
+    try:
+        # 1. 录音和识别阶段
+        if pressure_sensor and audio_recorder and speech_recognizer:
+            log_system("\n[Action] 开始录音和识别流程...")
+            
+            # 等待用户按下传感器开始录音
+            log_system("  [等待] 请按下传感器开始录音...")
+            if pressure_sensor._initialized:
+                if not pressure_sensor.wait_for_press(timeout=None):
+                    log_system("  ⚠ 等待按下传感器超时或失败")
+                    return
+                # 等待传感器释放，避免立即检测到按下状态
+                log_system("  [等待] 请释放传感器...")
+                if not pressure_sensor.wait_for_release(timeout=None):
+                    log_system("  ⚠ 等待释放传感器超时或失败")
+                    return
+                # 添加短暂延迟，确保传感器状态稳定
+                time.sleep(0.3)
+                # 再次确认传感器处于未按下状态
+                if pressure_sensor.is_pressed():
+                    log_system("  ⚠ 传感器仍处于按下状态，请释放后再试")
+                    return
+            else:
+                log_system("  ⚠ 压力传感器未初始化，跳过等待")
+            
+            # 开始录音
+            log_system("  [录音] 开始录音...")
+            audio_file_path = audio_recorder.start_recording()
+            if not audio_file_path:
+                log_system("  ⚠ 开始录音失败")
+                return
+            
+            log_system(f"  ✓ 录音已开始: {audio_file_path}")
+            log_system("  [等待] 请再次按下传感器停止录音...")
+            
+            # 等待用户再次按下传感器停止录音
+            if pressure_sensor._initialized:
+                # 先确保传感器处于未按下状态（避免立即检测到按下）
+                while pressure_sensor.is_pressed():
+                    time.sleep(0.1)
+                # 等待新的按下事件
+                if not pressure_sensor.wait_for_press(timeout=None):
+                    log_system("  ⚠ 等待停止录音超时或失败")
+                    audio_recorder.stop_recording()
+                    return
+            else:
+                log_system("  ⚠ 压力传感器未初始化，跳过等待")
+            
+            # 停止录音
+            log_system("  [录音] 停止录音...")
+            audio_recorder.stop_recording()
+            log_system("  ✓ 录音已停止")
+            
+            # 等待一小段时间确保录音文件已保存（stop_recording 会等待线程完成，但再等待一下更保险）
+            time.sleep(0.5)
+            
+            # 识别录音文件
+            if audio_file_path and os.path.exists(audio_file_path):
+                log_system("  [识别] 开始语音识别...")
+                result_file = speech_recognizer.recognize(
+                    audio_file_path,
+                    delete_after_recognition=True,
+                    convert_audio=True
+                )
+                if result_file:
+                    log_system(f"  ✓ 语音识别完成，结果已保存: {result_file}")
+                else:
+                    log_system("  ⚠ 语音识别失败")
+                    return
+            else:
+                log_system(f"  ⚠ 录音文件不存在: {audio_file_path}")
+                return
+        else:
+            log_system("\n[Warning] 录音或识别工具不可用，跳过录音识别流程")
+        
+        # 2. 数据准备阶段
         print("\n[Action] 触发语音交互...")
         
         voice_data = read_json_file(FILE_VOICE_OUTPUT)
@@ -241,7 +348,25 @@ def main():
         import traceback
         traceback.print_exc()
     finally:
+        # 清理资源
+        log_system("\n[Cleanup] 清理资源...")
         mqtt.stop()
+        log_system("  ✓ MQTT连接已关闭")
+        
+        if pressure_sensor:
+            try:
+                pressure_sensor.cleanup()
+                log_system("  ✓ 压力传感器已清理")
+            except:
+                pass
+        
+        if audio_recorder:
+            try:
+                audio_recorder.cleanup()
+                log_system("  ✓ 音频录音器已清理")
+            except:
+                pass
+        
         print("程序已结束。")
 
 if __name__ == "__main__":

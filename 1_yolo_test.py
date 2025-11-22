@@ -287,6 +287,13 @@ def main():
             # 检查 object_name 是否为 null
             if object_name and object_name != "null" and object_name.lower() != "null":
                 log_system(f"  ✓ 成功识别到物体: {object_name}")
+                # 识别完成后删除原始照片，节省空间
+                try:
+                    if os.path.exists(photo_path):
+                        os.remove(photo_path)
+                        log_system(f"  ✓ 已删除原始照片: {photo_path}")
+                except Exception as e:
+                    log_system(f"  ⚠ 删除照片失败: {e}")
                 break
             else:
                 log_system(f"  ⚠ 未识别到有效物体 (object_name: {object_name})")
@@ -307,6 +314,13 @@ def main():
         
         if not object_name or object_name == "null" or object_name.lower() == "null":
             log_system(f"\n[Error] 经过 {max_attempts} 次尝试，仍未识别到有效物体")
+            # 删除最后一次拍摄的照片，节省空间
+            try:
+                if 'photo_path' in locals() and photo_path and os.path.exists(photo_path):
+                    os.remove(photo_path)
+                    log_system(f"  ✓ 已删除最后一次拍摄的照片: {photo_path}")
+            except Exception as e:
+                log_system(f"  ⚠ 删除照片失败: {e}")
             log_system("  程序将退出")
             return
         

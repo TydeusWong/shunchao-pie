@@ -10,6 +10,7 @@ import subprocess
 import logging
 import base64
 import requests
+import json
 from typing import Optional
 
 # 导入配置
@@ -21,6 +22,8 @@ from config import (
     ASR_FORMAT,
     SOX_VOLUME_GAIN,
     OUTPUT_DIR,
+    TEMP_DATA_DIR,
+    FILE_VOICE_OUTPUT,
     DEBUG_LOG
 )
 
@@ -208,49 +211,61 @@ class SpeechRecognition:
                 logger.info("✓ API调用成功")
                 
                 output = result.output
+                logger.debug(f"API返回的完整输出: {output}")
                 
                 if 'results' in output and len(output['results']) > 0:
                     transcription = output['results'][0]
+                    logger.debug(f"识别结果对象: {transcription}")
                     
                     # 先尝试直接获取文本
                     full_text = transcription.get('transcription', '').strip()
+                    logger.debug(f"直接获取的文本: '{full_text}'")
                     
                     # 如果直接文本为空，尝试从URL下载
                     if not full_text and 'transcription_url' in transcription:
                         transcription_url = transcription['transcription_url']
                         logger.info("文本为空，尝试从URL下载结果")
                         full_text = self._download_transcription(transcription_url)
+                        logger.debug(f"从URL下载的文本: '{full_text}'")
+                    
+                    # 尝试其他可能的字段名
+                    if not full_text:
+                        # 尝试 'text' 字段
+                        full_text = transcription.get('text', '').strip()
+                        logger.debug(f"从'text'字段获取的文本: '{full_text}'")
+                    
+                    if not full_text:
+                        # 尝试 'sentence' 字段
+                        full_text = transcription.get('sentence', '').strip()
+                        logger.debug(f"从'sentence'字段获取的文本: '{full_text}'")
                     
                     if full_text:
                         logger.info(f"✓ 识别结果: {full_text}")
                         
-                        # 保存识别结果
-                        base_name = os.path.splitext(audio_file)[0]
-                        txt_file = f"{base_name}.txt"
+                        # 保存识别结果到 voice_output.txt（JSON格式）
+                        # 确保目录存在
+                        os.makedirs(TEMP_DATA_DIR, exist_ok=True)
                         
-                        # 如果输出目录存在，使用输出目录
-                        if OUTPUT_DIR:
-                            abs_output_dir = os.path.abspath(OUTPUT_DIR)
-                            os.makedirs(abs_output_dir, exist_ok=True)
-                            filename = os.path.basename(txt_file)
-                            txt_file = os.path.join(abs_output_dir, filename)
-                        else:
-                            txt_dir = os.path.dirname(txt_file)
-                            if txt_dir:
-                                os.makedirs(txt_dir, exist_ok=True)
+                        # 构建输出数据
+                        output_data = {
+                            "human_message": full_text
+                        }
                         
-                        with open(txt_file, 'w', encoding='utf-8') as f:
-                            f.write(full_text)
+                        # 覆盖写入到指定文件
+                        with open(FILE_VOICE_OUTPUT, 'w', encoding='utf-8') as f:
+                            json.dump(output_data, f, ensure_ascii=False, indent=4)
                         
-                        logger.info(f"识别结果已保存: {txt_file}")
+                        logger.info(f"识别结果已保存: {FILE_VOICE_OUTPUT}")
                         
                         # 删除录音文件
                         if delete_after_recognition:
                             self._delete_audio_files(audio_file, audio_file_to_recognize, convert_audio)
                         
-                        return txt_file
+                        return FILE_VOICE_OUTPUT
                     else:
                         logger.error("无法获取识别结果文本")
+                        logger.error(f"识别结果对象的所有字段: {list(transcription.keys()) if transcription else 'None'}")
+                        logger.error(f"识别结果对象的完整内容: {transcription}")
                         # 即使识别失败，如果设置了删除，也要删除文件
                         if delete_after_recognition:
                             self._delete_audio_files(audio_file, audio_file_to_recognize, convert_audio)

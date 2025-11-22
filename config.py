@@ -83,7 +83,7 @@ FONT_EN_SIZE = 48
 FONT_CN_SIZE = 32
 
 # ====== SOX 音频转换参数 ======
-SOX_VOLUME_GAIN = 3.0        # 音量增益倍数
+SOX_VOLUME_GAIN = 10.0        # 音量增益倍数
 
 # ====== ASR 识别参数 ======
 ASR_MODEL = "paraformer-v2"  # DashScope ASR模型
