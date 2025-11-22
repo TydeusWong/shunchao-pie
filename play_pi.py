@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import time
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -71,7 +72,9 @@ def execute_response(data_dict: dict) -> bool:
     try:
         print("\n--- [硬件执行开始] ---")
         
-        # 1. TTS / 语音输出
+        # 1. TTS / 语音输出（后台播放）
+        audio_player = None
+        audio_path = None
         message = data_dict.get("message")
         if message:
             print(f"🔊 [TTS] 正在合成并播放: \"{message}\"")
@@ -80,12 +83,12 @@ def execute_response(data_dict: dict) -> bool:
                 audio_path = synthesize_text(message)
                 if audio_path and os.path.exists(audio_path):
                     print(f"  ✓ 音频合成成功: {audio_path}")
-                    # 播放音频
+                    # 开始播放音频（不等待，后台播放）
                     audio_player = _get_audio_player()
                     if audio_player:
-                        success = audio_player.play_file(audio_path, wait=True, delete_after_play=True)
+                        success = audio_player.play_file(audio_path, wait=False, delete_after_play=True)
                         if success:
-                            print("  ✓ 音频播放完成")
+                            print("  ✓ 音频播放已开始（后台播放）")
                         else:
                             print("  ⚠ 音频播放失败")
                     else:
@@ -97,7 +100,7 @@ def execute_response(data_dict: dict) -> bool:
         else:
             print("🔊 [TTS] 没有可播放的消息。")
 
-        # 2. 情绪 / 表情
+        # 2. 情绪 / 表情（立即显示）
         mood_id = data_dict.get("mood_id")
         if mood_id is not None:
             print(f"😊 [Expression] 设置情绪 ID: {mood_id}")
@@ -116,11 +119,17 @@ def execute_response(data_dict: dict) -> bool:
                     print(f"  ⚠ 表情图片不存在: {mood_image_path}")
             except Exception as e:
                 print(f"  ⚠ 表情显示异常: {e}")
+        
+        # 等待1秒后显示单词卡片
+        time.sleep(2)
 
         # 3. 动作 (检查特定的词性)
         noun = data_dict.get("noun")
         verb = data_dict.get("verb")
         adjective = data_dict.get("adjective")
+        
+        # 记录单词卡片开始显示的时间
+        flashcard_start_time = None
         
         # 默认图片路径
         default_word_image = os.path.join(PROJECT_ROOT, "imgs", "words", "apple.png")
@@ -148,6 +157,8 @@ def execute_response(data_dict: dict) -> bool:
                         chinese_word=chinese_word,
                         display_driver=display_driver
                     )
+                    if flashcard_start_time is None:
+                        flashcard_start_time = time.time()
                     print(f"  ✓ 名词单词卡片已显示: {english_word} - {chinese_word}")
                 else:
                     print("  ⚠ 显示屏或单词卡片工具不可用")
@@ -177,6 +188,8 @@ def execute_response(data_dict: dict) -> bool:
                         chinese_word=chinese_word,
                         display_driver=display_driver
                     )
+                    if flashcard_start_time is None:
+                        flashcard_start_time = time.time()
                     print(f"  ✓ 动词单词卡片已显示: {english_word} - {chinese_word}")
                 else:
                     print("  ⚠ 显示屏或单词卡片工具不可用")
@@ -206,11 +219,41 @@ def execute_response(data_dict: dict) -> bool:
                         chinese_word=chinese_word,
                         display_driver=display_driver
                     )
+                    if flashcard_start_time is None:
+                        flashcard_start_time = time.time()
                     print(f"  ✓ 形容词单词卡片已显示: {english_word} - {chinese_word}")
                 else:
                     print("  ⚠ 显示屏或单词卡片工具不可用")
             except Exception as e:
                 print(f"  ⚠ 形容词处理异常: {e}")
+
+        # 4. 等待音频播放完成，同时确保单词卡片至少显示1秒
+        if audio_player and audio_path:
+            print("⏳ [等待] 等待音频播放完成...")
+            try:
+                # 等待音频播放完成
+                while audio_player.is_playing():
+                    time.sleep(0.1)  # 每100ms检查一次
+                
+                # 确保单词卡片至少显示1秒
+                if flashcard_start_time is not None:
+                    elapsed_time = time.time() - flashcard_start_time
+                    if elapsed_time < 1.0:
+                        remaining_time = 1.0 - elapsed_time
+                        print(f"  ⏳ 确保单词卡片至少显示1秒，还需等待 {remaining_time:.2f} 秒")
+                        time.sleep(remaining_time)
+                
+                # 删除音频文件
+                if os.path.exists(audio_path):
+                    try:
+                        os.remove(audio_path)
+                        print(f"  ✓ 已删除音频文件: {audio_path}")
+                    except Exception as e:
+                        print(f"  ⚠ 删除音频文件失败: {e}")
+                
+                print("  ✓ 音频播放完成")
+            except Exception as e:
+                print(f"  ⚠ 等待音频播放时出错: {e}")
 
         print("--- [硬件执行结束] ---\n")
         return True
@@ -220,3 +263,4 @@ def execute_response(data_dict: dict) -> bool:
         import traceback
         traceback.print_exc()
         return False
+

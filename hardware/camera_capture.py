@@ -6,7 +6,6 @@
 """
 import os
 import sys
-import time
 import cv2
 import numpy as np
 import logging
@@ -35,8 +34,7 @@ CAMERA_HEIGHT = 1080
 class CameraCapture:
     """
     摄像头拍摄工具类
-    支持USB摄像头和树莓派摄像头
-    自动检测并使用可用的摄像头
+    支持USB摄像头拍摄照片
     """
     
     def __init__(self,
@@ -79,11 +77,8 @@ class CameraCapture:
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
             
-            # 等待摄像头稳定
-            logger.debug("等待摄像头稳定...")
-            time.sleep(1)
-            
-            # 读取几帧以让摄像头调整
+            # 读取几帧以让摄像头调整（读取帧本身已经包含了等待时间）
+            logger.debug("让摄像头调整...")
             for _ in range(5):
                 ret, frame = cap.read()
                 if not ret:
@@ -116,66 +111,14 @@ class CameraCapture:
         finally:
             cap.release()
     
-    def capture_photo_picamera(self) -> Optional[np.ndarray]:
-        """
-        使用树莓派摄像头拍摄照片
-        
-        返回:
-            numpy.ndarray: 拍摄的照片（BGR格式），失败返回None
-        """
-        logger.debug("尝试使用树莓派摄像头...")
-        try:
-            from picamera2 import Picamera2
-            
-            picam2 = Picamera2()
-            
-            # 配置摄像头为1080p
-            config = picam2.create_still_configuration(
-                main={"size": (self.width, self.height)}
-            )
-            picam2.configure(config)
-            picam2.start()
-            
-            # 等待摄像头稳定
-            logger.debug("等待摄像头稳定...")
-            time.sleep(1)
-            
-            # 拍摄照片
-            logger.debug("正在拍摄照片...")
-            frame = picam2.capture_array()
-            
-            # picamera2 返回的是RGB格式，需要转换为BGR（OpenCV格式）
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            
-            picam2.stop()
-            picam2.close()
-            
-            logger.debug(f"实际分辨率: {self.width}x{self.height}")
-            return frame
-            
-        except ImportError:
-            logger.debug("picamera2 未安装，跳过树莓派摄像头")
-            return None
-        except Exception as e:
-            logger.exception(f"树莓派摄像头拍摄异常: {e}")
-            return None
-    
     def capture(self) -> Optional[np.ndarray]:
         """
-        拍摄照片（自动选择可用的摄像头）
+        拍摄照片（使用USB摄像头）
         
         返回:
             numpy.ndarray: 拍摄的照片（BGR格式），失败返回None
         """
-        # 首先尝试USB摄像头
-        frame = self.capture_photo_usb_camera()
-        
-        # 如果USB摄像头失败，尝试树莓派摄像头
-        if frame is None:
-            logger.debug("USB摄像头不可用，尝试树莓派摄像头...")
-            frame = self.capture_photo_picamera()
-        
-        return frame
+        return self.capture_photo_usb_camera()
     
     def save_photo(self, 
                    frame: np.ndarray,

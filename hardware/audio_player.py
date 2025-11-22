@@ -26,18 +26,85 @@ class AudioPlayer:
     """
     音频播放工具类
     支持文件播放和流式播放
+    支持蓝牙设备播放（需要手动连接蓝牙设备）
     """
     
-    def __init__(self, audio_device: str = "pulse"):
+    def __init__(self, audio_device: Optional[str] = None):
         """
         初始化音频播放器
         
         参数:
-            audio_device: 音频设备，默认"pulse"（PulseAudio）
+            audio_device: 音频设备，None表示自动检测（优先使用已连接的蓝牙设备）
+                         可以是 "pulse"、"alsa"、"auto"
+                         或 "pulse/<sink名称>" 格式指定具体设备
+                         注意: PipeWire 0.3.x 通过 PulseAudio 兼容层使用 "pulse" 前缀
+                         注意: 蓝牙设备需要手动连接，程序只会检测已连接的蓝牙设备
         """
+        if audio_device is None:
+            # 自动检测：优先使用已连接的蓝牙设备
+            audio_device = self._detect_best_audio_device()
+        
         self.audio_device = audio_device
         self.mpv_process = None
         self._mpv_installed = None
+        logger.debug(f"音频播放器初始化，使用设备: {self.audio_device}")
+    
+    def _detect_best_audio_device(self) -> str:
+        """
+        自动检测最佳音频设备
+        优先使用已连接的蓝牙设备，如果没有则使用默认设备
+        注意: 只检测已连接的蓝牙设备，不进行连接操作
+        兼容 PipeWire 0.3.x 和 PulseAudio
+        
+        返回:
+            音频设备字符串
+        """
+        try:
+            # 使用 pactl 获取所有可用的音频输出（兼容 PipeWire 和 PulseAudio）
+            result = subprocess.run(
+                ['pactl', 'list', 'short', 'sinks'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0 and result.stdout.strip():
+                sinks = []
+                for line in result.stdout.strip().split('\n'):
+                    if line.strip():
+                        # PipeWire 0.3.x 和 PulseAudio 都使用制表符分隔
+                        parts = line.split('\t')
+                        if len(parts) >= 2:
+                            sink_name = parts[1].strip()
+                            if sink_name:  # 确保名称不为空
+                                sinks.append(sink_name)
+                
+                if sinks:
+                    # 优先查找蓝牙设备
+                    for sink in sinks:
+                        sink_lower = sink.lower()
+                        # 兼容不同的命名格式（PipeWire 0.3.x 可能使用不同的命名）
+                        if any(keyword in sink_lower for keyword in ['blue', 'bluetooth', 'bt']):
+                            device = f"pulse/{sink}"
+                            logger.info(f"检测到蓝牙音频设备: {device}")
+                            return device
+                    
+                    # 如果没有蓝牙设备，使用第一个可用的sink
+                    device = f"pulse/{sinks[0]}"
+                    logger.info(f"使用音频输出设备: {device}")
+                    return device
+            else:
+                logger.debug("pactl 未返回音频输出列表，使用默认设备")
+        except FileNotFoundError:
+            logger.warning("pactl 命令未找到，使用默认音频设备")
+        except subprocess.TimeoutExpired:
+            logger.warning("检测音频设备超时，使用默认设备")
+        except Exception as e:
+            logger.warning(f"检测音频设备时出错: {e}")
+        
+        # 默认使用pulse（兼容 PipeWire 和 PulseAudio）
+        logger.debug("使用默认音频设备: pulse")
+        return "pulse"
     
     def check_mpv_installed(self) -> bool:
         """检查MPV播放器是否安装"""
@@ -280,6 +347,34 @@ class AudioPlayer:
             return False
         
         return True
+    
+    def get_available_audio_devices(self) -> List[str]:
+        """
+        获取所有可用的音频输出设备列表
+        
+        返回:
+            音频设备名称列表
+        """
+        devices = []
+        try:
+            result = subprocess.run(
+                ['pactl', 'list', 'short', 'sinks'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                for line in result.stdout.strip().split('\n'):
+                    if line.strip():
+                        parts = line.split('\t')
+                        if len(parts) >= 2:
+                            sink_name = parts[1]
+                            devices.append(f"pulse/{sink_name}")
+        except Exception as e:
+            logger.warning(f"获取音频设备列表时出错: {e}")
+        
+        return devices
     
     def cleanup(self):
         """清理资源"""

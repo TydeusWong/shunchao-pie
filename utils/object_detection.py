@@ -11,13 +11,15 @@ import cv2
 import numpy as np
 import logging
 from typing import Optional
+from datetime import datetime
 
 # 导入配置
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import (
     PROJECT_ROOT,
     FILE_OBJECT_NAME,
-    DEBUG_LOG
+    DEBUG_LOG,
+    TEMP_DATA_DIR
 )
 
 # 配置日志
@@ -118,14 +120,6 @@ class ObjectDetection:
             hearer_boxes = hearer_results.boxes.xyxy.cpu().numpy()
             hearer_scores = hearer_results.boxes.conf.cpu().numpy()
             
-            if len(hearer_boxes) == 0:
-                logger.debug("未检测到hearer")
-                return "null"
-            
-            best_idx = np.argmax(hearer_scores)
-            best_hearer_box = hearer_boxes[best_idx]
-            logger.debug(f"检测到hearer，置信度: {hearer_scores[best_idx]:.2f}")
-            
             # ---------------- General：筛选有效物体 ----------------
             general_results = self._general_model(img, verbose=False)[0]
             other_boxes = general_results.boxes.xyxy.cpu().numpy()
@@ -133,12 +127,33 @@ class ObjectDetection:
             other_classes = general_results.boxes.cls.cpu().numpy()
             class_names = general_results.names
             
+            closest_name = "null"
+            
+            if len(hearer_boxes) == 0:
+                logger.debug("未检测到hearer")
+                # 即使没有hearer，也保存带标签的图片
+                self._save_annotated_image(img, hearer_results, general_results, closest_name, image_path)
+                return "null"
+            
+            best_idx = np.argmax(hearer_scores)
+            best_hearer_score = hearer_scores[best_idx]
+            logger.debug(f"检测到hearer，置信度: {best_hearer_score:.2f}")
+            
+            # 检查hearer置信度是否高于0.7
+            if best_hearer_score < 0.7:
+                logger.debug(f"hearer置信度 {best_hearer_score:.2f} 低于阈值 0.7，视为无效识别")
+                # 即使置信度不够，也保存带标签的图片
+                self._save_annotated_image(img, hearer_results, general_results, closest_name, image_path)
+                return "null"
+            
+            best_hearer_box = hearer_boxes[best_idx]
+            
             valid_objects = []
             ignore_classes = ["person", "frisbee"]
             
             for o_box, cls_idx, o_score in zip(other_boxes, other_classes, other_scores):
                 obj_name = class_names[int(cls_idx)]
-                if o_score < 0.3:
+                if o_score < 0.25:
                     continue
                 if obj_name in ignore_classes:
                     continue
@@ -149,6 +164,8 @@ class ObjectDetection:
             # ---------------- 没有其他有效物体 ----------------
             if len(valid_objects) == 0:
                 logger.debug("未检测到其他有效物体")
+                # 即使没有有效物体，也保存带标签的图片
+                self._save_annotated_image(img, hearer_results, general_results, closest_name, image_path)
                 return "null"
             
             # ---------------- 计算中心点距离最近的物体 ----------------
@@ -157,7 +174,6 @@ class ObjectDetection:
             hcy = (hy1 + hy2) / 2
             
             min_dist = float("inf")
-            closest_name = "null"
             for o_box, obj_name in valid_objects:
                 ox1, oy1, ox2, oy2 = o_box
                 ocx = (ox1 + ox2) / 2
@@ -168,11 +184,116 @@ class ObjectDetection:
                     closest_name = obj_name
             
             logger.info(f"检测到最接近的物体: {closest_name} (距离: {min_dist:.2f})")
+            
+            # 保存带标签的图片
+            self._save_annotated_image(img, hearer_results, general_results, closest_name, image_path)
+            
             return closest_name
             
         except Exception as e:
             logger.exception(f"物体检测异常: {e}")
+            # 即使发生异常，也尝试保存图片（如果可能）
+            try:
+                if 'img' in locals() and 'hearer_results' in locals() and 'general_results' in locals():
+                    self._save_annotated_image(img, hearer_results, general_results, "null", image_path)
+            except:
+                pass
             return "null"
+    
+    def _save_annotated_image(self, img, hearer_results, general_results, closest_name, original_image_path):
+        """
+        保存带YOLO标签的图片
+        
+        参数:
+            img: 原始图片（numpy数组）
+            hearer_results: hearer模型的检测结果
+            general_results: 通用模型的检测结果
+            closest_name: 最接近的物体名称
+            original_image_path: 原始图片路径
+        """
+        try:
+            # 复制原始图片用于绘制
+            annotated_img = img.copy()
+            
+            # 绘制hearer的检测结果（红色边界框）
+            if len(hearer_results.boxes) > 0:
+                hearer_boxes = hearer_results.boxes.xyxy.cpu().numpy()
+                hearer_scores = hearer_results.boxes.conf.cpu().numpy()
+                best_idx = np.argmax(hearer_scores)
+                best_box = hearer_boxes[best_idx].astype(int)
+                score = hearer_scores[best_idx]
+                
+                # 绘制hearer边界框（红色）
+                x1, y1, x2, y2 = best_box
+                cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 0, 255), 3)  # 红色
+                # 添加标签
+                label = f"Hearer: {score:.2f}"
+                label_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                cv2.rectangle(annotated_img, (x1, y1 - label_size[1] - 10), 
+                             (x1 + label_size[0], y1), (0, 0, 255), -1)
+                cv2.putText(annotated_img, label, (x1, y1 - 5), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            
+            # 绘制通用模型的检测结果（绿色边界框）
+            if len(general_results.boxes) > 0:
+                other_boxes = general_results.boxes.xyxy.cpu().numpy()
+                other_scores = general_results.boxes.conf.cpu().numpy()
+                other_classes = general_results.boxes.cls.cpu().numpy()
+                class_names = general_results.names
+                
+                ignore_classes = ["person", "frisbee"]
+                
+                for o_box, cls_idx, o_score in zip(other_boxes, other_classes, other_scores):
+                    obj_name = class_names[int(cls_idx)]
+                    
+                    # 只绘制有效物体
+                    if o_score < 0.25:
+                        continue
+                    if obj_name in ignore_classes:
+                        continue
+                    
+                    # 判断是否是最接近的物体
+                    is_closest = (obj_name == closest_name)
+                    color = (0, 255, 0) if is_closest else (255, 255, 0)  # 最近物体用绿色，其他用黄色
+                    thickness = 3 if is_closest else 2
+                    
+                    x1, y1, x2, y2 = o_box.astype(int)
+                    cv2.rectangle(annotated_img, (x1, y1), (x2, y2), color, thickness)
+                    
+                    # 添加标签
+                    label = f"{obj_name}: {o_score:.2f}"
+                    if is_closest:
+                        label = f"★ {label}"  # 标记最接近的物体
+                    
+                    label_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                    cv2.rectangle(annotated_img, (x1, y1 - label_size[1] - 10), 
+                                 (x1 + label_size[0], y1), color, -1)
+                    cv2.putText(annotated_img, label, (x1, y1 - 5), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+            
+            # 生成输出文件名
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            base_name = os.path.splitext(os.path.basename(original_image_path))[0]
+            output_filename = f"{base_name}_annotated_{timestamp}.jpg"
+            output_path = os.path.join(TEMP_DATA_DIR, output_filename)
+            
+            # 确保输出目录存在
+            os.makedirs(TEMP_DATA_DIR, exist_ok=True)
+            
+            # 保存图片
+            success = cv2.imwrite(output_path, annotated_img)
+            if success:
+                logger.info(f"带标签的图片已保存: {output_path}")
+                print(f"[ObjectDetection] 带标签的图片已保存: {output_path}")
+            else:
+                logger.error(f"保存带标签图片失败: {output_path}")
+                print(f"[ObjectDetection] 错误: 保存带标签图片失败: {output_path}")
+            
+        except Exception as e:
+            logger.exception(f"保存带标签图片异常: {e}")
+            print(f"[ObjectDetection] 错误: 保存带标签图片异常: {e}")
+            import traceback
+            traceback.print_exc()
     
     def detect_and_save(self, 
                        image_path: str,

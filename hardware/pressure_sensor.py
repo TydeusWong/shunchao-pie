@@ -77,7 +77,7 @@ class PressureSensor:
         检测压力传感器是否被按下
         
         返回:
-            True表示按下（低电平），False表示未按下（高电平）
+            True表示按下（高电平），False表示未按下（低电平）
         """
         if not self._initialized:
             logger.warning("GPIO未初始化，无法检测")
@@ -85,9 +85,9 @@ class PressureSensor:
         
         try:
             import lgpio
-            # 读取GPIO状态，0表示按下（低电平），1表示未按下（高电平）
+            # 读取GPIO状态，1表示按下（高电平），0表示未按下（低电平）
             state = lgpio.gpio_read(self.gpio_chip, self.pin)
-            return state == 0
+            return state == 1
         except Exception as e:
             logger.exception(f"读取GPIO状态失败: {e}")
             return False

@@ -12,7 +12,13 @@ import logging
 from datetime import datetime
 from config import *
 from comm.mqtt_client import MqttHandler
-from utils import execute_response
+# 导入根目录的 play_pi.py 文件中的 execute_response
+import importlib.util
+_play_pi_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "play_pi.py")
+_play_pi_spec = importlib.util.spec_from_file_location("play_pi_file", _play_pi_file_path)
+_play_pi_module = importlib.util.module_from_spec(_play_pi_spec)
+_play_pi_spec.loader.exec_module(_play_pi_module)
+execute_response = _play_pi_module.execute_response
 
 # --- 全局同步事件 ---
 response_received_event = threading.Event()
@@ -153,7 +159,7 @@ def wait_for_response(timeout=30):
             print("\n[Timeout] 服务器响应超时。")
             return
             
-        time.sleep(0.5)
+        time.sleep(0.1)  # 优化：从0.5秒缩短到0.1秒，加快响应
         print(".", end="", flush=True)
         dot_count += 1
         if dot_count >= 6:
@@ -182,8 +188,8 @@ def main():
     mqtt.start(subscriptions=subscriptions, callback=on_server_message)
     logging.info(f"音频测试已启动。设备 ID: {DEVICE_ID}")
     
-    # 短暂等待连接
-    time.sleep(1)
+    # 短暂等待连接（优化：从1秒缩短到0.2秒）
+    time.sleep(0.2)
     
     print("\n=== 音频交互测试 ===")
     print(f"Device ID: {DEVICE_ID}")
