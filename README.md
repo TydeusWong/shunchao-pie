@@ -1,4 +1,4 @@
-# Tydeus 项目
+# Thingdom 物语
 
 一个基于 Raspberry Pi 的智能交互系统，集成了物体识别、语音交互和显示屏反馈功能。
 
@@ -124,7 +124,7 @@ python3 main.py
 #### 1. 物体识别测试
 
 ```bash
-python3 1_yolo_test.py
+python3 modules/1_yolo_test.py
 ```
 
 功能：
@@ -136,7 +136,7 @@ python3 1_yolo_test.py
 #### 2. 音频交互测试
 
 ```bash
-python3 2_audio_test.py
+python3 modules/2_audio_test.py
 ```
 
 功能：
@@ -149,7 +149,7 @@ python3 2_audio_test.py
 #### 3. 结束对话测试
 
 ```bash
-python3 3_finish_test.py
+python3 modules/3_finish_test.py
 ```
 
 功能：
@@ -163,12 +163,15 @@ python3 3_finish_test.py
 tydeus/
 ├── main.py                 # 主程序入口
 ├── config.py               # 全局配置文件
-├── play_pi.py              # 硬件执行响应（TTS、显示等）
-├── 1_yolo_test.py          # 物体识别测试
-├── 2_audio_test.py         # 音频交互测试
-├── 3_finish_test.py        # 结束对话测试
 ├── requirements.txt        # Python 依赖列表
 ├── install_dependencies.sh  # 依赖安装脚本
+├── .env                    # 环境变量配置文件（需自行创建）
+├── .env.example            # 环境变量配置模板
+├── modules/                # 功能模块目录
+│   ├── 1_yolo_test.py      # 物体识别测试
+│   ├── 2_audio_test.py     # 音频交互测试
+│   ├── 3_finish_test.py    # 结束对话测试
+│   └── play_pi.py          # 硬件执行响应（TTS、显示等）
 ├── hardware/               # 硬件驱动模块
 │   ├── __init__.py
 │   ├── button.py           # 按钮驱动
@@ -243,7 +246,7 @@ PROGRESS_RING_COLOR_LOCKED = (100, 100, 100)         # 锁定状态颜色（深�
    - 启动按钮长按监控线程（全局监听）
 
 2. **Stage 1: 物体识别**
-   - 执行 `1_yolo_test.py`
+   - 执行 `modules/1_yolo_test.py`
    - 拍摄照片并识别物体
    - 发送识别结果到服务器
    - 等待响应并执行
@@ -263,7 +266,7 @@ PROGRESS_RING_COLOR_LOCKED = (100, 100, 100)         # 锁定状态颜色（深�
 4. **Stage 3: 结束对话**
    - 如果检测到按钮长按：
      - 显示 `shutdown.png`
-     - 执行 `3_finish_test.py`
+     - 执行 `modules/3_finish_test.py`
      - 发送结束对话消息
      - 等待响应并执行
      - 熄灭显示屏
