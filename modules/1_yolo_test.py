@@ -12,7 +12,7 @@ import logging
 from datetime import datetime
 from config import *
 from comm.mqtt_client import MqttHandler
-# 导入根目录的 play_pi.py 文件中的 execute_response
+# 导入同目录下的 play_pi.py 文件中的 execute_response
 import importlib.util
 _play_pi_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "play_pi.py")
 _play_pi_spec = importlib.util.spec_from_file_location("play_pi_file", _play_pi_file_path)

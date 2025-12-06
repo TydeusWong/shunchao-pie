@@ -34,3 +34,6 @@ lgpio>=0.2.0.0
 # MQTT 相关
 paho-mqtt>=1.6.1
 
+# 环境变量管理
+python-dotenv>=1.0.0
+

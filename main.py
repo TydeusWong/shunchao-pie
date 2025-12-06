@@ -17,20 +17,21 @@ from comm.mqtt_client import MqttHandler
 import importlib.util
 
 # 导入 1_yolo_test.py
-_yolo_test_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "1_yolo_test.py")
+_yolo_test_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules", "1_yolo_test.py")
 _yolo_spec = importlib.util.spec_from_file_location("yolo_test", _yolo_test_path)
 _yolo_module = importlib.util.module_from_spec(_yolo_spec)
 _yolo_spec.loader.exec_module(_yolo_module)
 yolo_main = _yolo_module.main
 
 # 导入 2_audio_test.py
-_audio_test_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "2_audio_test.py")
+_audio_test_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules", "2_audio_test.py")
 _audio_spec = importlib.util.spec_from_file_location("audio_test", _audio_test_path)
 _audio_module = importlib.util.module_from_spec(_audio_spec)
 _audio_spec.loader.exec_module(_audio_module)
+audio_main = _audio_module.main
 
 # 导入 3_finish_test.py
-_finish_test_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "3_finish_test.py")
+_finish_test_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules", "3_finish_test.py")
 _finish_spec = importlib.util.spec_from_file_location("finish_test", _finish_test_path)
 _finish_module = importlib.util.module_from_spec(_finish_spec)
 _finish_spec.loader.exec_module(_finish_module)
@@ -343,7 +344,7 @@ def run_audio_cycle_once(mqtt, button, audio_recorder, speech_recognizer, displa
                         save_conversation_id(new_conv_id)
                     
                     # 调用硬件执行
-                    from play_pi import execute_response
+                    from modules.play_pi import execute_response
                     success = execute_response(data)
                     if success:
                         log_system("[System] 硬件执行成功完成。")

@@ -3,13 +3,17 @@
 包含所有硬件参数、API配置、音频参数等
 """
 import os
+from dotenv import load_dotenv
+
+# 加载 .env 文件中的环境变量
+load_dotenv()
 
 # ====== API 配置 ======
 # DashScope API (语音识别)
-DASHSCOPE_API_KEY = "sk-f2f906f5b94e4616934849e9082bfb90"
+DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "")
 
 # MiniMax API (语音合成)
-MINIMAX_API_KEY = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJHcm91cE5hbWUiOiJTSlRVIiwiVXNlck5hbWUiOiJTSlRVIiwiQWNjb3VudCI6IiIsIlN1YmplY3RJRCI6IjE5ODYwMTY3OTI3MjM1OTUzNjMiLCJQaG9uZSI6IjEzMzk2ODg4MDY5IiwiR3JvdXBJRCI6IjE5ODYwMTY3OTI3MTUyMDY3NTUiLCJQYWdlTmFtZSI6IiIsIk1haWwiOiIiLCJDcmVhdGVUaW1lIjoiMjAyNS0xMS0wNSAyMDowODoxOCIsIlRva2VuVHlwZSI6MSwiaXNzIjoibWluaW1heCJ9.CTy8Ggo8Bth-1ZohgFkdZS8uLovfrr1HE6ROv9kNCaczo20UlTWvsCfK3mMBIqVoexAyF6ReaGeoJFtE0QgKQ08jxkxm__s_Y-IY0SHizfQzlwgRj43g28GrrHFHbZ_BJojOHiUcNCW3iwD5t1AQTBCoqSgDs1khj5RNxkGz5K2wEYgUpUxDPe4ATQvIUmX5ajSmrr4ZQp2eb9UgkZnsPDI8oASLwN4SivVQ5QeMsUHsUc4e4XsaRQGdl4zps_ubP0r6_53P1BD_6PsO3_Dw7I_07umGiLifApC4V135eqHj3NpBrqusR1-kVwpMxNVEECkhkxtNcop24zhU99fZJw"
+MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
 
 # ====== GPIO 硬件配置 ======
 USE_GPIO = True
@@ -99,9 +103,9 @@ ASR_MODEL = "paraformer-v2"  # DashScope ASR模型
 ASR_FORMAT = "wav"           # 音频格式
 
 # ====== MQTT 配置 ======
-MQTT_BROKER = "47.110.250.41"
-MQTT_PORT = 1883
-DEVICE_ID = "tydeus123"
+MQTT_BROKER = os.getenv("MQTT_BROKER", "47.110.250.41")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
+DEVICE_ID = os.getenv("DEVICE_ID", "tydeus123")
 
 # Topics - Outbound (Device -> Server)
 TOPIC_OBJECT_DETECTED = "device/object_detected"
