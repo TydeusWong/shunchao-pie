@@ -19,6 +19,9 @@ _play_pi_spec = importlib.util.spec_from_file_location("play_pi_file", _play_pi_
 _play_pi_module = importlib.util.module_from_spec(_play_pi_spec)
 _play_pi_spec.loader.exec_module(_play_pi_module)
 execute_response = _play_pi_module.execute_response
+# 导入按钮工具
+from hardware.button import Button
+from hardware.ep1831t_driver import EP1831TDriver
 
 # --- 全局同步事件 ---
 response_received_event = threading.Event()
@@ -165,6 +168,52 @@ def main():
     """结束对话测试主函数"""
     ensure_temp_data_dir()
     
+    # 初始化显示屏驱动
+    display_driver = None
+    try:
+        display_driver = EP1831TDriver()
+        log_system("✓ 显示屏驱动初始化成功")
+    except Exception as e:
+        log_system(f"⚠ 显示屏驱动初始化失败: {e}")
+        log_system("  将继续运行，但无法显示图片")
+    
+    # 初始化按钮
+    button = None
+    try:
+        button = Button()
+        log_system("✓ 按钮初始化成功")
+    except Exception as e:
+        log_system(f"⚠ 按钮初始化失败: {e}")
+        log_system("  将跳过按钮检测")
+    
+    # 等待按钮长按触发
+    if button and button._initialized:
+        log_system("\n[等待] 请长按按钮（2秒）以启动程序...")
+        if not button.wait_for_long_press(timeout=None):
+            log_system("  ⚠ 未检测到长按，程序退出")
+            if button:
+                try:
+                    button.cleanup()
+                except:
+                    pass
+            return
+        log_system("  ✓ 检测到长按，程序启动")
+        
+        # 立即显示shutdown.png
+        if display_driver:
+            shutdown_image_path = os.path.join(PROJECT_ROOT, "imgs", "waiting", "shutdown.png")
+            if os.path.exists(shutdown_image_path):
+                try:
+                    display_driver.display_image(shutdown_image_path)
+                    log_system(f"[Display] 显示关闭图片: {shutdown_image_path}")
+                except Exception as e:
+                    log_system(f"[Error] 显示关闭图片失败: {e}")
+        
+        # 等待按钮释放
+        button.wait_for_release(timeout=5)
+    else:
+        log_system("\n[Warning] 按钮不可用，直接启动程序")
+    
     # 初始化 MQTT
     mqtt = MqttHandler(MQTT_BROKER, MQTT_PORT, DEVICE_ID)
     
@@ -212,7 +261,34 @@ def main():
         import traceback
         traceback.print_exc()
     finally:
+        # 清理资源
+        log_system("\n[Cleanup] 清理资源...")
+        
+        # 熄灭显示屏
+        if display_driver:
+            try:
+                display_driver.fill_color(0, 0, 0)  # 填充黑色，熄灭显示屏
+                log_system("  ✓ 显示屏已熄灭")
+            except Exception as e:
+                log_system(f"  ⚠ 熄灭显示屏失败: {e}")
+        
         mqtt.stop()
+        log_system("  ✓ MQTT连接已关闭")
+        
+        if button:
+            try:
+                button.cleanup()
+                log_system("  ✓ 按钮已清理")
+            except:
+                pass
+        
+        if display_driver:
+            try:
+                display_driver.cleanup()
+                log_system("  ✓ 显示屏驱动已清理")
+            except:
+                pass
+        
         print("程序已结束。")
 
 if __name__ == "__main__":

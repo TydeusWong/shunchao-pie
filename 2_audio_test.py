@@ -20,8 +20,9 @@ _play_pi_module = importlib.util.module_from_spec(_play_pi_spec)
 _play_pi_spec.loader.exec_module(_play_pi_module)
 execute_response = _play_pi_module.execute_response
 # 导入硬件工具
-from hardware.pressure_sensor import PressureSensor
+from hardware.button import Button
 from hardware.audio_recorder import AudioRecorder
+from hardware.ep1831t_driver import EP1831TDriver
 # 导入语音识别工具
 from utils.speech_recognition import SpeechRecognition
 
@@ -149,12 +150,23 @@ def on_server_message(topic, payload):
 
 # --- 动画效果 ---
 
-def wait_for_response(timeout=30):
+def wait_for_response(timeout=30, display_driver=None):
     """
     阻塞并打印加载动画，直到 response_received_event 被设置或超时。
+    同时显示等待图片。
     """
     start_time = time.time()
     response_received_event.clear()
+    
+    # 显示等待图片（thinking.png）
+    if display_driver:
+        thinking_image_path = os.path.join(PROJECT_ROOT, "imgs", "waiting", "thinking.png")
+        if os.path.exists(thinking_image_path):
+            try:
+                display_driver.display_image(thinking_image_path)
+                log_system(f"[Display] 显示等待图片: {thinking_image_path}")
+            except Exception as e:
+                log_system(f"[Error] 显示等待图片失败: {e}")
     
     print("等待回复 ", end="", flush=True)
     dot_count = 0
@@ -199,14 +211,23 @@ def main():
     print("\n=== 音频交互测试 ===")
     print(f"Device ID: {DEVICE_ID}")
     
-    # 初始化压力传感器
-    pressure_sensor = None
+    # 初始化显示屏驱动
+    display_driver = None
     try:
-        pressure_sensor = PressureSensor()
-        log_system("✓ 压力传感器初始化成功")
+        display_driver = EP1831TDriver()
+        log_system("✓ 显示屏驱动初始化成功")
     except Exception as e:
-        log_system(f"⚠ 压力传感器初始化失败: {e}")
-        log_system("  将跳过压力传感器检测")
+        log_system(f"⚠ 显示屏驱动初始化失败: {e}")
+        log_system("  将继续运行，但无法显示图片")
+    
+    # 初始化按钮
+    button = None
+    try:
+        button = Button()
+        log_system("✓ 按钮初始化成功")
+    except Exception as e:
+        log_system(f"⚠ 按钮初始化失败: {e}")
+        log_system("  将跳过按钮检测")
     
     # 初始化音频录音器
     audio_recorder = None
@@ -228,28 +249,28 @@ def main():
     
     try:
         # 1. 录音和识别阶段
-        if pressure_sensor and audio_recorder and speech_recognizer:
+        if button and audio_recorder and speech_recognizer:
             log_system("\n[Action] 开始录音和识别流程...")
             
-            # 等待用户按下传感器开始录音
-            log_system("  [等待] 请按下传感器开始录音...")
-            if pressure_sensor._initialized:
-                if not pressure_sensor.wait_for_press(timeout=None):
-                    log_system("  ⚠ 等待按下传感器超时或失败")
+            # 等待用户按下按钮开始录音
+            log_system("  [等待] 请按下按钮开始录音...")
+            if button._initialized:
+                if not button.wait_for_press(timeout=None):
+                    log_system("  ⚠ 等待按下按钮超时或失败")
                     return
-                # 等待传感器释放，避免立即检测到按下状态
-                log_system("  [等待] 请释放传感器...")
-                if not pressure_sensor.wait_for_release(timeout=None):
-                    log_system("  ⚠ 等待释放传感器超时或失败")
+                # 等待按钮释放，避免立即检测到按下状态
+                log_system("  [等待] 请释放按钮...")
+                if not button.wait_for_release(timeout=None):
+                    log_system("  ⚠ 等待释放按钮超时或失败")
                     return
-                # 添加短暂延迟，确保传感器状态稳定
+                # 添加短暂延迟，确保按钮状态稳定
                 time.sleep(0.3)
-                # 再次确认传感器处于未按下状态
-                if pressure_sensor.is_pressed():
-                    log_system("  ⚠ 传感器仍处于按下状态，请释放后再试")
+                # 再次确认按钮处于未按下状态
+                if button.is_pressed():
+                    log_system("  ⚠ 按钮仍处于按下状态，请释放后再试")
                     return
             else:
-                log_system("  ⚠ 压力传感器未初始化，跳过等待")
+                log_system("  ⚠ 按钮未初始化，跳过等待")
             
             # 开始录音
             log_system("  [录音] 开始录音...")
@@ -259,20 +280,31 @@ def main():
                 return
             
             log_system(f"  ✓ 录音已开始: {audio_file_path}")
-            log_system("  [等待] 请再次按下传感器停止录音...")
             
-            # 等待用户再次按下传感器停止录音
-            if pressure_sensor._initialized:
-                # 先确保传感器处于未按下状态（避免立即检测到按下）
-                while pressure_sensor.is_pressed():
+            # 显示录音等待图片（recording.png）
+            if display_driver:
+                recording_image_path = os.path.join(PROJECT_ROOT, "imgs", "waiting", "recording.png")
+                if os.path.exists(recording_image_path):
+                    try:
+                        display_driver.display_image(recording_image_path)
+                        log_system(f"[Display] 显示录音图片: {recording_image_path}")
+                    except Exception as e:
+                        log_system(f"[Error] 显示录音图片失败: {e}")
+            
+            log_system("  [等待] 请再次按下按钮停止录音...")
+            
+            # 等待用户再次按下按钮停止录音
+            if button._initialized:
+                # 先确保按钮处于未按下状态（避免立即检测到按下）
+                while button.is_pressed():
                     time.sleep(0.1)
                 # 等待新的按下事件
-                if not pressure_sensor.wait_for_press(timeout=None):
+                if not button.wait_for_press(timeout=None):
                     log_system("  ⚠ 等待停止录音超时或失败")
                     audio_recorder.stop_recording()
                     return
             else:
-                log_system("  ⚠ 压力传感器未初始化，跳过等待")
+                log_system("  ⚠ 按钮未初始化，跳过等待")
             
             # 停止录音
             log_system("  [录音] 停止录音...")
@@ -299,7 +331,7 @@ def main():
                 log_system(f"  ⚠ 录音文件不存在: {audio_file_path}")
                 return
         else:
-            log_system("\n[Warning] 录音或识别工具不可用，跳过录音识别流程")
+            log_system("\n[Warning] 按钮、录音或识别工具不可用，跳过录音识别流程")
         
         # 2. 数据准备阶段
         print("\n[Action] 触发语音交互...")
@@ -337,7 +369,7 @@ def main():
         mqtt.publish(TOPIC_USER_RESPONSE, json.dumps(payload))
         logging.info(f"已发布到 {TOPIC_USER_RESPONSE}: {payload}")
         
-        wait_for_response()
+        wait_for_response(timeout=30, display_driver=display_driver)
         
         print("\n✓ 音频交互测试完成")
         
@@ -353,10 +385,10 @@ def main():
         mqtt.stop()
         log_system("  ✓ MQTT连接已关闭")
         
-        if pressure_sensor:
+        if button:
             try:
-                pressure_sensor.cleanup()
-                log_system("  ✓ 压力传感器已清理")
+                button.cleanup()
+                log_system("  ✓ 按钮已清理")
             except:
                 pass
         
@@ -364,6 +396,13 @@ def main():
             try:
                 audio_recorder.cleanup()
                 log_system("  ✓ 音频录音器已清理")
+            except:
+                pass
+        
+        if display_driver:
+            try:
+                display_driver.cleanup()
+                log_system("  ✓ 显示屏驱动已清理")
             except:
                 pass
         

@@ -66,7 +66,19 @@ def execute_response(data_dict: dict) -> bool:
         },
         "exclamation": None,
         "discourse_marker": None,
-        "adverb": None
+        "adverb": None,
+        "islands_progress": [
+        {
+            "island_inner_id": 1,
+            "learned_percentage": "50.00",
+            "is_locked": false
+        },
+        {
+            "island_inner_id": 2,
+            "learned_percentage": "0.00",
+            "is_locked": true
+        }
+        ] | null
     }
     """
     try:
@@ -102,6 +114,8 @@ def execute_response(data_dict: dict) -> bool:
 
         # 2. 情绪 / 表情（立即显示）
         mood_id = data_dict.get("mood_id")
+        islands_progress = data_dict.get("islands_progress")  # 获取进度信息
+        mood_displayed = False
         if mood_id is not None:
             print(f"😊 [Expression] 设置情绪 ID: {mood_id}")
             try:
@@ -111,8 +125,10 @@ def execute_response(data_dict: dict) -> bool:
                 if os.path.exists(mood_image_path):
                     display_driver = _get_display_driver()
                     if display_driver:
-                        display_driver.display_image(mood_image_path)
+                        # 传递进度信息，用于绘制进度环
+                        display_driver.display_image(mood_image_path, islands_progress=islands_progress)
                         print(f"  ✓ 表情图片已显示: {mood_image_path}")
+                        mood_displayed = True
                     else:
                         print("  ⚠ 显示屏驱动不可用")
                 else:
@@ -120,8 +136,10 @@ def execute_response(data_dict: dict) -> bool:
             except Exception as e:
                 print(f"  ⚠ 表情显示异常: {e}")
         
-        # 等待1秒后显示单词卡片
-        time.sleep(2)
+        # 如果显示了mood图片，等待至少2秒后再显示单词卡片
+        # 这样可以确保mood图片有足够的显示时间
+        if mood_displayed:
+            time.sleep(2)
 
         # 3. 动作 (检查特定的词性)
         noun = data_dict.get("noun")
@@ -155,7 +173,8 @@ def execute_response(data_dict: dict) -> bool:
                         image_path=default_word_image,
                         english_word=english_word,
                         chinese_word=chinese_word,
-                        display_driver=display_driver
+                        display_driver=display_driver,
+                        islands_progress=islands_progress  # 传递进度信息
                     )
                     if flashcard_start_time is None:
                         flashcard_start_time = time.time()
@@ -186,7 +205,8 @@ def execute_response(data_dict: dict) -> bool:
                         image_path=default_word_image,
                         english_word=english_word,
                         chinese_word=chinese_word,
-                        display_driver=display_driver
+                        display_driver=display_driver,
+                        islands_progress=islands_progress  # 传递进度信息
                     )
                     if flashcard_start_time is None:
                         flashcard_start_time = time.time()
@@ -217,7 +237,8 @@ def execute_response(data_dict: dict) -> bool:
                         image_path=default_word_image,
                         english_word=english_word,
                         chinese_word=chinese_word,
-                        display_driver=display_driver
+                        display_driver=display_driver,
+                        islands_progress=islands_progress  # 传递进度信息
                     )
                     if flashcard_start_time is None:
                         flashcard_start_time = time.time()

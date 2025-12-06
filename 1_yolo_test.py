@@ -191,7 +191,7 @@ def main():
         log_system("  将继续运行，但无法显示图片")
     
     # 1. 初始化阶段：显示 MASTER 1.png
-    master_image_path = os.path.join(PROJECT_ROOT, "imgs", "eggs", "MASTER 1.png")
+    master_image_path = os.path.join(PROJECT_ROOT, "imgs", "waiting", "searching.png")
     if display_driver and os.path.exists(master_image_path):
         try:
             display_driver.display_image(master_image_path)

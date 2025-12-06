@@ -268,7 +268,8 @@ class FlashCardMaker:
                           chinese_word: str,
                           display_driver,
                           image_size: Optional[int] = None,
-                          image_y_offset: Optional[int] = None):
+                          image_y_offset: Optional[int] = None,
+                          islands_progress: Optional[list] = None):
         """
         创建并显示单词卡片到显示屏
         
@@ -279,13 +280,14 @@ class FlashCardMaker:
             display_driver: EP1831TDriver实例
             image_size: 图片大小（像素），默认使用config.py中的配置
             image_y_offset: 图片Y轴偏移（像素），默认使用config.py中的配置
+            islands_progress: 可选，章节学习进度列表，用于绘制进度环
         """
         try:
             card = self.create_card(image_path, english_word, chinese_word,
                                   image_size, image_y_offset)
             
             logger.info("显示单词卡片到显示屏...")
-            display_driver.display_image(card)
+            display_driver.display_image(card, islands_progress=islands_progress)
             logger.info("单词卡片显示完成")
         except Exception as e:
             logger.exception(f"显示单词卡片失败: {e}")

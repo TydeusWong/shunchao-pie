@@ -10,8 +10,9 @@ import time
 import os
 import sys
 import logging
+import math
 from typing import Optional, Union
-from PIL import Image
+from PIL import Image, ImageDraw
 
 # 导入配置
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,7 +22,11 @@ from config import (
     SCREEN_WIDTH,
     SCREEN_HEIGHT,
     SCREEN_SPI_SPEED,
-    DEBUG_LOG
+    DEBUG_LOG,
+    PROGRESS_RING_WIDTH,
+    PROGRESS_RING_COLOR_COMPLETED,
+    PROGRESS_RING_COLOR_INCOMPLETE,
+    PROGRESS_RING_COLOR_LOCKED
 )
 
 # 配置日志
@@ -269,12 +274,13 @@ class EP1831TDriver:
             logger.exception(f"设置窗口失败: {e}")
             raise
     
-    def display_image(self, image: Union[str, Image.Image]):
+    def display_image(self, image: Union[str, Image.Image], islands_progress: Optional[list] = None):
         """
         显示图片
         
         参数:
             image: 图片路径（str）或PIL.Image对象，必须是360x360尺寸
+            islands_progress: 可选，章节学习进度列表，用于绘制进度环
         """
         if not self._initialized:
             raise RuntimeError("显示屏未初始化，请先调用初始化方法")
@@ -304,6 +310,10 @@ class EP1831TDriver:
                 else:
                     img = img.convert('RGB')
             
+            # 如果有进度信息，在图片上方绘制进度环图层
+            if islands_progress:
+                img = self._add_progress_ring_on_top(img, islands_progress)
+            
             # 转换为RGB888数据（每像素3字节）
             logger.debug("转换图片数据为RGB888格式...")
             pixels = img.load()
@@ -325,6 +335,144 @@ class EP1831TDriver:
         except Exception as e:
             logger.exception(f"显示图片失败: {e}")
             raise
+    
+    def _add_progress_ring_on_top(self, img: Image.Image, islands_progress: list) -> Image.Image:
+        """
+        在图片上方添加进度环图层
+        
+        参数:
+            img: PIL.Image对象
+            islands_progress: 章节学习进度列表
+        
+        返回:
+            添加了进度环图层的图片
+        """
+        try:
+            # 查找 island_inner_id = 1 的进度信息
+            progress_info = None
+            for island in islands_progress:
+                if isinstance(island, dict) and island.get("island_inner_id") == 1:
+                    progress_info = island
+                    break
+            
+            # 如果没有找到 island_inner_id = 1，不绘制进度环
+            if not progress_info:
+                logger.debug("未找到 island_inner_id = 1 的进度信息，跳过进度环绘制")
+                return img
+            
+            # 获取进度信息
+            learned_percentage = progress_info.get("learned_percentage", "0.00")
+            is_locked = progress_info.get("is_locked", False)
+            
+            # 转换进度百分比
+            try:
+                if isinstance(learned_percentage, str):
+                    progress = float(learned_percentage)
+                else:
+                    progress = float(learned_percentage)
+            except (ValueError, TypeError):
+                logger.warning(f"无效的进度值: {learned_percentage}，使用默认值0")
+                progress = 0.0
+            
+            # 确保进度在0-100之间
+            progress = max(0.0, min(100.0, progress))
+            
+            # 创建图片副本作为基础图层
+            result_img = img.copy()
+            
+            # 创建进度环图层（RGBA模式，支持透明）
+            ring_layer = Image.new('RGBA', img.size, (0, 0, 0, 0))
+            ring_draw = ImageDraw.Draw(ring_layer)
+            
+            # 在进度环图层上绘制进度环
+            self._draw_progress_ring(ring_draw, img.size, progress, is_locked)
+            
+            # 将进度环图层合成到原图片上方
+            result_img = Image.alpha_composite(
+                result_img.convert('RGBA'),
+                ring_layer
+            ).convert('RGB')
+            
+            logger.debug(f"进度环图层已添加: 进度={progress}%, 锁定={is_locked}")
+            return result_img
+            
+        except Exception as e:
+            logger.warning(f"绘制进度环时出错: {e}，返回原图片")
+            return img
+    
+    def _draw_progress_ring(self, draw: ImageDraw.Draw, size: tuple, progress: float, is_locked: bool):
+        """
+        在透明图层上绘制进度环（只绘制圆环部分，不覆盖中心）
+        
+        参数:
+            draw: ImageDraw对象（在RGBA透明图层上）
+            size: 图片尺寸 (width, height)
+            progress: 进度百分比 (0-100)
+            is_locked: 是否锁定
+        """
+        width, height = size
+        center_x = width // 2
+        center_y = height // 2
+        
+        # 计算圆环的半径（从中心到圆环外边缘）
+        outer_radius = min(width, height) // 2
+        inner_radius = outer_radius - PROGRESS_RING_WIDTH
+        
+        # 确定颜色（转换为RGBA格式）
+        if is_locked:
+            ring_color = PROGRESS_RING_COLOR_LOCKED + (255,)  # 添加alpha通道
+        else:
+            ring_color = PROGRESS_RING_COLOR_COMPLETED + (255,)  # 添加alpha通道
+        
+        incomplete_color = PROGRESS_RING_COLOR_INCOMPLETE + (255,)  # 添加alpha通道
+        
+        # 圆环的边界框（外圆）
+        outer_bbox = (
+            center_x - outer_radius,
+            center_y - outer_radius,
+            center_x + outer_radius,
+            center_y + outer_radius
+        )
+        
+        # 内圆的边界框
+        inner_bbox = (
+            center_x - inner_radius,
+            center_y - inner_radius,
+            center_x + inner_radius,
+            center_y + inner_radius
+        )
+        
+        # 绘制完整的未完成部分（灰色背景圆环）
+        # 先绘制外圆（填充）
+        draw.ellipse(outer_bbox, fill=incomplete_color, outline=incomplete_color)
+        # 然后绘制内圆（透明填充，形成圆环）
+        draw.ellipse(inner_bbox, fill=(0, 0, 0, 0), outline=(0, 0, 0, 0))
+        
+        # 如果进度>0且未锁定，绘制已完成部分
+        if progress > 0 and not is_locked:
+            # 计算完成的弧度（从顶部开始，顺时针）
+            # PIL的arc/pieslice使用度为单位，-90度是12点钟方向（顶部）
+            start_angle = -90  # 从顶部开始
+            end_angle = start_angle + (progress / 100.0) * 360
+            
+            # 绘制已完成部分的扇形（填充）
+            draw.pieslice(
+                outer_bbox,
+                start=start_angle,
+                end=end_angle,
+                fill=ring_color,
+                outline=ring_color
+            )
+            
+            # 清除扇形中间的内圆部分（使其透明）
+            draw.ellipse(inner_bbox, fill=(0, 0, 0, 0), outline=(0, 0, 0, 0))
+            
+        elif is_locked:
+            # 锁定状态：绘制完整的锁定颜色圆环
+            # 先绘制外圆（填充）
+            draw.ellipse(outer_bbox, fill=ring_color, outline=ring_color)
+            # 然后清除内圆（使其透明）
+            draw.ellipse(inner_bbox, fill=(0, 0, 0, 0), outline=(0, 0, 0, 0))
     
     def fill_color(self, r: int, g: int, b: int):
         """

@@ -2,6 +2,7 @@
 项目全局配置文件
 包含所有硬件参数、API配置、音频参数等
 """
+import os
 
 # ====== API 配置 ======
 # DashScope API (语音识别)
@@ -13,8 +14,10 @@ MINIMAX_API_KEY = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJHcm91cE5hbWUiOiJTSlRV
 # ====== GPIO 硬件配置 ======
 USE_GPIO = True
 SENSOR_PIN = 17              # 压力传感器引脚 (BCM 编号)
+BUTTON_PIN = 3               # 按钮引脚 (BCM 编号，GPIO3，按下时为低电平)
 LED_PIN = 27                 # LED 引脚 (BCM 编号)
 DEBOUNCE_TIME = 0.3          # 消抖时间（秒）
+BUTTON_LONG_PRESS_TIME = 2.0  # 按钮长按时间（秒）
 
 # ====== 显示屏配置 (EP1831T) ======
 SCREEN_RST_PIN = 23          # 复位引脚
@@ -66,8 +69,8 @@ FILE_WORDS_DATA = f"{TEMP_DATA_DIR}/words_data.json"
 # ====== 日志配置 ======
 DEBUG_LOG = True             # 是否启用调试日志
 LOG_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
-LOG_DIR = "logs"
-LOG_FILE = f"{LOG_DIR}/system.log"
+LOG_DIR = os.path.join(PROJECT_ROOT, "logs")  # 使用绝对路径
+LOG_FILE = os.path.join(LOG_DIR, "system.log")  # 使用绝对路径
 
 # ====== 单词卡片配置 ======
 CARD_BG_COLOR = (246, 235, 255)      # 背景色 #F6EBFF
@@ -75,6 +78,12 @@ CARD_CIRCLE_COLOR = (255, 255, 255)  # 圆形背景色
 CARD_TEXT_COLOR = (0, 0, 0)          # 文字颜色
 CARD_IMAGE_SIZE = 120                # 默认图片大小
 CARD_IMAGE_Y_OFFSET = -30            # 图片 Y 轴偏移
+
+# ====== 进度环配置 ======
+PROGRESS_RING_WIDTH = 5                              # 进度环宽度（像素）
+PROGRESS_RING_COLOR_COMPLETED = (76, 175, 80)        # 已完成部分颜色（绿色）
+PROGRESS_RING_COLOR_INCOMPLETE = (200, 200, 200)     # 未完成部分颜色（灰色）
+PROGRESS_RING_COLOR_LOCKED = (100, 100, 100)         # 锁定状态颜色（深灰色）
 
 # ====== 字体路径 ======
 FONT_EN_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
