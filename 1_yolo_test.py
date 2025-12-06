@@ -147,13 +147,13 @@ def wait_for_response(timeout=30, display_driver=None):
     start_time = time.time()
     response_received_event.clear()
     
-    # 显示等待图片
+    # 显示等待图片（thinking.png）
     if display_driver:
-        waiting_image_path = os.path.join(PROJECT_ROOT, "imgs", "waiting", "waiting.png")
-        if os.path.exists(waiting_image_path):
+        thinking_image_path = os.path.join(PROJECT_ROOT, "imgs", "waiting", "thinking.png")
+        if os.path.exists(thinking_image_path):
             try:
-                display_driver.display_image(waiting_image_path)
-                log_system(f"[Display] 显示等待图片: {waiting_image_path}")
+                display_driver.display_image(thinking_image_path)
+                log_system(f"[Display] 显示等待图片: {thinking_image_path}")
             except Exception as e:
                 log_system(f"[Error] 显示等待图片失败: {e}")
     
