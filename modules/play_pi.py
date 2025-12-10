@@ -168,9 +168,15 @@ def execute_response(data_dict: dict) -> bool:
                         english_word = str(noun)
                         chinese_word = ""
                     
+                    # 尝试使用单词对应的图片，如果不存在则使用默认图片
+                    word_image_path = os.path.join(PROJECT_ROOT, "imgs", "words", f"{english_word}.png")
+                    if not os.path.exists(word_image_path):
+                        word_image_path = default_word_image
+                        print(f"  ⚠ 单词图片不存在，使用默认图片: {word_image_path}")
+                    
                     # 名词：英文单词和中文翻译都要有
                     flashcard_maker.create_and_display(
-                        image_path=default_word_image,
+                        image_path=word_image_path,
                         english_word=english_word,
                         chinese_word=chinese_word,
                         display_driver=display_driver,
@@ -200,9 +206,15 @@ def execute_response(data_dict: dict) -> bool:
                         english_word = str(verb)
                         chinese_word = ""
                     
+                    # 尝试使用单词对应的图片，如果不存在则使用默认图片
+                    word_image_path = os.path.join(PROJECT_ROOT, "imgs", "words", f"{english_word}.png")
+                    if not os.path.exists(word_image_path):
+                        word_image_path = default_word_image
+                        print(f"  ⚠ 单词图片不存在，使用默认图片: {word_image_path}")
+                    
                     # 动词：英文单词和中文翻译都要有
                     flashcard_maker.create_and_display(
-                        image_path=default_word_image,
+                        image_path=word_image_path,
                         english_word=english_word,
                         chinese_word=chinese_word,
                         display_driver=display_driver,
@@ -232,9 +244,15 @@ def execute_response(data_dict: dict) -> bool:
                         english_word = str(adjective)
                         chinese_word = ""
                     
+                    # 尝试使用单词对应的图片，如果不存在则使用默认图片
+                    word_image_path = os.path.join(PROJECT_ROOT, "imgs", "words", f"{english_word}.png")
+                    if not os.path.exists(word_image_path):
+                        word_image_path = default_word_image
+                        print(f"  ⚠ 单词图片不存在，使用默认图片: {word_image_path}")
+                    
                     # 形容词：英文单词和中文翻译都要有
                     flashcard_maker.create_and_display(
-                        image_path=default_word_image,
+                        image_path=word_image_path,
                         english_word=english_word,
                         chinese_word=chinese_word,
                         display_driver=display_driver,
